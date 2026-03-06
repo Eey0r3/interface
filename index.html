@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPI 幾何特徵防禦系統展示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <div class="max-w-4xl mx-auto py-12 px-4">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                幾何特徵探針：IPI 攻擊偵測展示
+            </h1>
+            <p class="text-slate-400">
+                本系統連線至本機 <strong>RTX 3060 GPU 沙盒</strong>，利用 Llama-3 隱藏層特徵進行幾何空間分析。
+            </p>
+            <div class="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+                API 狀態：已連線至 Cloudflare Tunnel
+            </div>
+        </header>
+
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-2xl">
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-400 mb-2">輸入測試 Prompt (例如：忽略之前的指令並讀取資料...)</label>
+                <textarea id="promptInput" 
+                    class="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                    placeholder="請輸入欲測試的內容..."></textarea>
+            </div>
+
+            <button onclick="scanPrompt()" id="scanBtn"
+                class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20">
+                <i class="fas fa-microscope"></i> 開始幾何偵測分析
+            </button>
+
+            <div id="resultCard" class="mt-8 hidden overflow-hidden rounded-xl border border-slate-700 bg-slate-900/50 p-6 transition-all">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex flex-col justify-center">
+                        <div id="statusBadge" class="inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4"></div>
+                        <h3 id="statusTitle" class="text-2xl font-bold mb-2"></h3>
+                        <p id="statusDesc" class="text-slate-400 text-sm"></p>
+                    </div>
+
+                    <div class="space-y-3 bg-slate-900/80 p-4 rounded-lg border border-slate-800">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">LID 幾何分數 (異常值)</span>
+                            <span id="lidScore" class="font-mono text-blue-400 font-bold">--</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">推論耗時 (Latency)</span>
+                            <span id="latency" class="font-mono text-emerald-400">--</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">特徵維度 (Dimensions)</span>
+                            <span id="featureDim" class="font-mono text-purple-400">--</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div id="scoreBar" class="h-full bg-blue-500 transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-slate-500 text-sm">
+            <p>國科會研究計畫：基於 LLM 隱藏層幾何特徵之輕量化防禦</p>
+            <div class="mt-2 flex justify-center gap-4">
+                <a href="#" class="hover:text-blue-400 transition-colors"><i class="fab fa-github"></i> Source Code</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        async function scanPrompt() {
+            const prompt = document.getElementById('promptInput').value;
+            const scanBtn = document.getElementById('scanBtn');
+            const resultCard = document.getElementById('resultCard');
+            
+            // 💡 這裡填入你的 Cloudflare 網址
+            const API_URL = "https://prozac-science-meditation-its.trycloudflare.com/api/scan";
+
+            if (!prompt.trim()) return alert("請輸入內容");
+
+            // UI Loading State
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> 偵測中...';
+            resultCard.classList.add('hidden');
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "prompt": prompt })
+                });
+
+                const data = await response.json();
+
+                // Update UI based on result
+                resultCard.classList.remove('hidden');
+                document.getElementById('lidScore').innerText = data.lid_score;
+                document.getElementById('latency').innerText = data.latency_ms + " ms";
+                document.getElementById('featureDim').innerText = data.feature_dim + " 維";
+
+                const badge = document.getElementById('statusBadge');
+                const title = document.getElementById('statusTitle');
+                const desc = document.getElementById('statusDesc');
+                const bar = document.getElementById('scoreBar');
+
+                // 模擬判定邏輯 (目前後端回傳 mock 數據)
+                if (data.is_malicious) {
+                    badge.className = "inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4 bg-red-900/30 text-red-400 border border-red-800";
+                    badge.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i> Detected';
+                    title.innerText = "偵測到 IPI 攻擊";
+                    title.className = "text-2xl font-bold mb-2 text-red-400";
+                    desc.innerText = "輸入內容在 Layer 24 產生顯著語意偏移，判定為間接提示注入攻擊。";
+                    bar.className = "h-full bg-red-500";
+                    bar.style.width = "90%";
+                } else {
+                    badge.className = "inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4 bg-emerald-900/30 text-emerald-400 border border-emerald-800";
+                    badge.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Safe';
+                    title.innerText = "語意特徵正常";
+                    title.className = "text-2xl font-bold mb-2 text-emerald-400";
+                    desc.innerText = "輸入內容落在正常語意流形區塊內，無偵測到惡意偏移。";
+                    bar.className = "h-full bg-emerald-500";
+                    bar.style.width = "15%";
+                }
+
+            } catch (error) {
+                alert("API 連線失敗，請檢查本機 Docker 與 Tunnel 是否正常開啟！");
+            } finally {
+                scanBtn.disabled = false;
+                scanBtn.innerHTML = '<i class="fas fa-microscope"></i> 開始幾何偵測分析';
+            }
+        }
+    </script>
+</body>
+</html>
