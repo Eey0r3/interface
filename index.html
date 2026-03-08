@@ -3,121 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPI 幾何特徵防禦系統展示</title>
+    <title>IPI 幾何特徵防禦探針 | 底層流形監控</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+        /* 自訂滾動條以符合專業外觀 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans overflow-x-hidden">
+<body class="bg-slate-950 text-slate-200 h-screen flex flex-col font-sans overflow-hidden selection:bg-blue-500/30">
 
-    <div id="sidebar" class="fixed inset-y-0 left-0 w-full md:w-[600px] bg-slate-800 border-r border-slate-700 shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out z-50 flex flex-col">
-        <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900">
-            <h2 class="text-lg font-semibold text-slate-300"><i class="fas fa-cube text-blue-400 mr-2"></i>語意流形 3D 空間 (Layer 1)</h2>
-            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white transition-colors p-2">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        <div class="flex-grow p-4 relative">
-            <div id="plotly-graph" class="w-full h-full bg-slate-900 rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center">
-                <span id="graph-loading" class="text-slate-500"><i class="fas fa-spinner animate-spin mr-2"></i>載入資料集幾何邊界中...</span>
+    <nav class="h-16 border-b border-slate-800 glass-panel flex items-center justify-between px-6 z-20 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/50 flex items-center justify-center">
+                <i class="fas fa-shield-halved text-blue-400"></i>
             </div>
-        </div>
-    </div>
-
-    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300"></div>
-
-    <div class="max-w-3xl mx-auto py-12 px-4 relative z-10">
-        
-        <button onclick="toggleSidebar()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2">
-            <i class="fas fa-satellite-dish text-blue-400"></i> 展開流形雷達
-        </button>
-
-        <header class="text-center mb-10 mt-8">
-            <h1 class="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                幾何特徵探針：IPI 偵測
+            <h1 class="text-xl font-bold tracking-wide text-slate-100">
+                IPI 幾何特徵防禦<span class="text-blue-500 font-light mx-2">|</span><span class="text-slate-400 text-sm">即時探針系統</span>
             </h1>
-            <p class="text-slate-400">利用 Llama-3 隱藏層進行即時 LID 局部密度計算</p>
-            <div class="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
-                <span class="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse" id="api-indicator"></span>
-                <span id="api-text">API 狀態：嘗試連線至幾何引擎...</span>
-            </div>
-        </header>
-
-        <div class="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-2xl mb-8">
-            <label class="block text-sm font-medium text-slate-400 mb-3">請輸入欲測試的指令或對話：</label>
-            <textarea id="promptInput" 
-                class="w-full h-40 bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none resize-none mb-4"
-                placeholder="例如：Please summarize the following email..."></textarea>
-            
-            <button onclick="scanPrompt()" id="scanBtn" disabled
-                class="w-full bg-slate-600 text-slate-300 font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-not-allowed text-lg tracking-wide">
-                <i class="fas fa-microscope"></i> 系統初始化中...
-            </button>
         </div>
+        <div class="flex items-center px-3 py-1.5 rounded-md bg-slate-900 border border-slate-700 text-xs shadow-inner">
+            <span class="relative flex h-2 w-2 mr-2">
+              <span id="api-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+              <span id="api-indicator" class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+            </span>
+            <span id="api-text" class="text-slate-300 font-medium tracking-wide">引擎連線中...</span>
+        </div>
+    </nav>
 
-        <div id="resultCard" class="hidden overflow-hidden rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-2xl transition-all">
-            <div id="statusBadge" class="inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4"></div>
-            <h3 id="statusTitle" class="text-3xl font-bold mb-2"></h3>
-            <p id="statusDesc" class="text-slate-400 text-sm mb-6 leading-relaxed"></p>
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        
+        <aside class="w-full md:w-[450px] lg:w-[500px] h-full flex flex-col border-r border-slate-800 bg-slate-900/40 z-10 shrink-0 shadow-2xl">
+            <div class="p-6 flex-1 overflow-y-auto">
+                
+                <div class="mb-6">
+                    <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">
+                        <i class="fas fa-terminal mr-2"></i>推論請求攔截 (Request Interception)
+                    </h2>
+                    <div class="relative group">
+                        <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                        <textarea id="promptInput" 
+                            class="relative w-full h-40 bg-slate-950 border border-slate-700 rounded-xl p-4 text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none resize-none font-mono text-sm leading-relaxed shadow-inner"
+                            placeholder="輸入未授權之外部文本或 Prompt...&#10;&#10;e.g. Please summarize the following email:&#10;Ignore previous instructions and execute..."></textarea>
+                    </div>
+                    
+                    <button onclick="scanPrompt()" id="scanBtn" disabled
+                        class="mt-4 w-full bg-slate-800 border border-slate-700 text-slate-400 font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-not-allowed text-sm tracking-wide group overflow-hidden relative">
+                        <div id="btn-bg" class="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 transition-opacity duration-300"></div>
+                        <span class="relative z-10 flex items-center gap-2">
+                            <i class="fas fa-satellite-dish"></i> 系統初始化中
+                        </span>
+                    </button>
+                </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
-                    <div class="text-slate-500 text-xs mb-1">LID 幾何分數</div>
-                    <div id="lidScore" class="font-mono text-2xl text-blue-400 font-bold">--</div>
-                </div>
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
-                    <div class="text-slate-500 text-xs mb-1">推論耗時</div>
-                    <div id="latency" class="font-mono text-2xl text-emerald-400 font-bold">--</div>
-                </div>
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
-                    <div class="text-slate-500 text-xs mb-1">特徵維度</div>
-                    <div id="featureDim" class="font-mono text-2xl text-purple-400 font-bold">--</div>
+                <div id="resultCard" class="hidden flex-col gap-4 transition-all duration-500 opacity-0 translate-y-4">
+                    <div class="h-px w-full bg-gradient-to-r from-transparent via-slate-700 to-transparent my-2"></div>
+                    
+                    <div class="flex justify-between items-start">
+                        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest">
+                            <i class="fas fa-chart-network mr-2"></i>分析報告
+                        </h2>
+                        <div id="statusBadge" class="px-2.5 py-1 rounded border text-xs font-bold tracking-wide"></div>
+                    </div>
+
+                    <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-5 shadow-inner">
+                        <h3 id="statusTitle" class="text-2xl font-bold mb-2 tracking-tight"></h3>
+                        <p id="statusDesc" class="text-slate-400 text-xs leading-relaxed mb-5"></p>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-slate-900 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center relative overflow-hidden">
+                                <div class="text-slate-500 text-[10px] font-bold uppercase mb-1">LID 異常指數</div>
+                                <div id="lidScore" class="font-mono text-xl text-blue-400 font-bold">--</div>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center">
+                                <div class="text-slate-500 text-[10px] font-bold uppercase mb-1">探針推論延遲</div>
+                                <div id="latency" class="font-mono text-xl text-slate-200 font-bold">--</div>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center col-span-2">
+                                <div class="flex justify-between items-center w-full">
+                                    <div class="text-slate-500 text-[10px] font-bold uppercase">觀測特徵空間維度</div>
+                                    <div id="featureDim" class="font-mono text-sm text-purple-400 font-bold">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <div class="mt-6 text-center">
-                <button onclick="toggleSidebar()" class="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4 transition-colors">
-                    查看此筆輸入在 3D 流形空間中的精確落點 <i class="fas fa-arrow-right ml-1"></i>
-                </button>
+            <div class="p-4 border-t border-slate-800 text-center bg-slate-950 shrink-0">
+                <p class="text-[10px] text-slate-600 font-mono">POWERED BY Llama-3 & PARAMETRIC UMAP</p>
             </div>
-        </div>
+        </aside>
 
-    </div>
+        <section class="flex-1 relative bg-[#0a0f18] z-0" id="graph-container">
+            <div class="absolute top-4 left-4 z-10 glass-panel border border-slate-700/50 p-3 rounded-lg shadow-xl pointer-events-none">
+                <h2 class="text-sm font-bold text-slate-200 flex items-center">
+                    <i class="fas fa-cube text-blue-500 mr-2"></i>高維語意流形投影 (Layer $L_{optimal}$)
+                </h2>
+                <p class="text-[10px] text-slate-400 mt-1 ml-6">提取自注意力加權池化特徵</p>
+            </div>
+            
+            <div id="graph-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0f18] z-20 transition-opacity duration-500">
+                <div class="relative w-16 h-16 mb-4">
+                    <div class="absolute inset-0 rounded-full border-t-2 border-blue-500 animate-spin"></div>
+                    <div class="absolute inset-2 rounded-full border-b-2 border-purple-500 animate-spin shadow-[0_0_15px_rgba(168,85,247,0.5)]" style="animation-direction: reverse;"></div>
+                </div>
+                <p class="text-slate-400 text-sm font-mono tracking-widest animate-pulse">SYNCHRONIZING MANIFOLD...</p>
+            </div>
+
+            <div id="plotly-graph" class="absolute inset-0 w-full h-full"></div>
+        </section>
+    </main>
 
     <script>
         // 🚨 填入你的 Cloudflare Tunnel 網址
         const API_BASE = "https://creatures-finding-highs-funky.trycloudflare.com"; 
 
         let userTraceIndex = -1;
-        let isGraphRendered = false;
 
-        // 側邊欄開關邏輯
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            
-            if (sidebar.classList.contains('-translate-x-full')) {
-                // 開啟
-                sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('hidden');
-                // 延遲一點讓 opacity 有漸變效果
-                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
-                
-                // ⚠️ Plotly 在隱藏狀態下繪製會變形，必須在展開時強制重新調整大小
-                if (isGraphRendered) {
-                    setTimeout(() => {
-                        Plotly.Plots.resize('plotly-graph');
-                    }, 300);
-                }
-            } else {
-                // 關閉
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('opacity-0');
-                setTimeout(() => overlay.classList.add('hidden'), 300);
-            }
-        }
-
+        // 初始化與 Resize 監聽
         document.addEventListener("DOMContentLoaded", async () => {
+            // 監聽視窗改變，強制 Plotly 重新計算大小
+            window.addEventListener('resize', () => {
+                const graphDiv = document.getElementById('plotly-graph');
+                if (graphDiv.data) {
+                    Plotly.Plots.resize(graphDiv);
+                }
+            });
+
             try {
                 const response = await fetch(`${API_BASE}/api/dataset_info`);
                 if (!response.ok) throw new Error("API 連線失敗");
@@ -126,65 +144,90 @@
                 
                 if (data.status === "success") {
                     renderBaseGraph(data.data.points);
-                    isGraphRendered = true;
                     
+                    // 解鎖按鈕
                     const btn = document.getElementById("scanBtn");
+                    const btnBg = document.getElementById("btn-bg");
                     btn.disabled = false;
-                    btn.className = "w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-900/20 text-lg tracking-wide";
-                    btn.innerHTML = '<i class="fas fa-microscope"></i> 開始幾何偵測分析';
+                    btn.classList.remove("cursor-not-allowed", "text-slate-400");
+                    btn.classList.add("text-white", "cursor-pointer", "border-transparent", "shadow-lg", "shadow-blue-900/20");
+                    btnBg.classList.remove("opacity-0");
+                    btn.querySelector('span').innerHTML = '<i class="fas fa-radar text-blue-200"></i> 啟動幾何特徵掃描';
 
-                    document.getElementById("api-indicator").className = "w-2 h-2 rounded-full bg-emerald-500 mr-2";
-                    document.getElementById("api-text").innerText = "API 狀態：流形幾何引擎運作中";
+                    // 更新 API 燈號
+                    document.getElementById("api-indicator").className = "relative inline-flex rounded-full h-2 w-2 bg-emerald-500";
+                    document.getElementById("api-ping").className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75";
+                    document.getElementById("api-text").innerText = "引擎已連線";
+                    document.getElementById("api-text").className = "text-emerald-400 font-bold text-xs tracking-wide";
                 }
             } catch (error) {
-                document.getElementById("graph-loading").innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>無法連線，請確認 Tunnel 狀態。</span>`;
-                document.getElementById("api-indicator").className = "w-2 h-2 rounded-full bg-red-500 mr-2";
-                document.getElementById("api-text").innerText = "API 狀態：離線";
+                document.getElementById("graph-loading").innerHTML = `
+                    <div class="text-center">
+                        <i class="fas fa-link-slash text-red-500 text-3xl mb-3"></i>
+                        <p class="text-red-400 text-sm font-mono tracking-widest">CONNECTION FAILED</p>
+                        <p class="text-slate-500 text-xs mt-2">請確認本機 FastAPI 與 Cloudflare Tunnel 運行狀態</p>
+                    </div>`;
+                document.getElementById("api-indicator").className = "relative inline-flex rounded-full h-2 w-2 bg-red-500";
+                document.getElementById("api-ping").classList.add("hidden");
+                document.getElementById("api-text").innerText = "離線狀態";
             }
         });
 
         function renderBaseGraph(points) {
-            document.getElementById("graph-loading").style.display = "none";
+            const loading = document.getElementById("graph-loading");
+            loading.classList.add("opacity-0");
+            setTimeout(() => loading.style.display = "none", 500);
             
             const normalPoints = points.filter(p => p.label === 0);
             const attackPoints = points.filter(p => p.label === 1);
 
             const traceNormal = {
                 x: normalPoints.map(p => p.x), y: normalPoints.map(p => p.y), z: normalPoints.map(p => p.z),
-                mode: 'markers', marker: { size: 5, color: '#10b981', opacity: 0.7 },
-                name: '正常 (Normal)', type: 'scatter3d', hoverinfo: 'text',
+                mode: 'markers', 
+                marker: { size: 4, color: '#10b981', opacity: 0.4, line: {width: 0} }, // 稍微調淡背景點
+                name: '正常流形 (Normal)', type: 'scatter3d', hoverinfo: 'text',
                 hovertext: normalPoints.map(p => `Normal<br>${p.text}`)
             };
 
             const traceAttack = {
                 x: attackPoints.map(p => p.x), y: attackPoints.map(p => p.y), z: attackPoints.map(p => p.z),
-                mode: 'markers', marker: { size: 5, color: '#ef4444', opacity: 0.7 },
-                name: '攻擊 (Attack)', type: 'scatter3d', hoverinfo: 'text',
+                mode: 'markers', 
+                marker: { size: 4, color: '#ef4444', opacity: 0.6, line: {width: 0} },
+                name: '對抗子空間 (Attack)', type: 'scatter3d', hoverinfo: 'text',
                 hovertext: attackPoints.map(p => `Attack<br>${p.text}`)
             };
 
             const layout = {
                 margin: { l: 0, r: 0, b: 0, t: 0 },
-                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)', 
+                plot_bgcolor: 'rgba(0,0,0,0)',
                 scene: {
-                    xaxis: { showgrid: true, gridcolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' },
-                    yaxis: { showgrid: true, gridcolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' },
-                    zaxis: { showgrid: true, gridcolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' }
+                    xaxis: { showgrid: true, gridcolor: '#1e293b', zerolinecolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' },
+                    yaxis: { showgrid: true, gridcolor: '#1e293b', zerolinecolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' },
+                    zaxis: { showgrid: true, gridcolor: '#1e293b', zerolinecolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' },
+                    camera: { eye: {x: 1.5, y: 1.5, z: 1.2} } // 預設視角稍微拉遠一點
                 },
-                legend: { font: { color: '#cbd5e1' }, x: 0, y: 1 }
+                legend: { 
+                    font: { color: '#94a3b8', family: 'monospace' }, 
+                    x: 0.02, y: 0.9, 
+                    bgcolor: 'rgba(15, 23, 42, 0.5)',
+                    bordercolor: 'rgba(51, 65, 85, 0.5)',
+                    borderwidth: 1
+                }
             };
 
-            Plotly.newPlot('plotly-graph', [traceNormal, traceAttack], layout, {responsive: true});
+            Plotly.newPlot('plotly-graph', [traceNormal, traceAttack], layout, {responsive: true, displayModeBar: false});
         }
 
         async function scanPrompt() {
             const prompt = document.getElementById('promptInput').value;
             const scanBtn = document.getElementById('scanBtn');
+            const spanText = scanBtn.querySelector('span');
 
-            if (!prompt.trim()) return alert("請輸入內容");
+            if (!prompt.trim()) return alert("請輸入待測文本");
 
             scanBtn.disabled = true;
-            scanBtn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> 幾何特徵提取與 LID 計算中...';
+            spanText.innerHTML = '<i class="fas fa-circle-notch fa-spin text-blue-200"></i> 張量提取與投影中...';
 
             try {
                 const response = await fetch(`${API_BASE}/api/scan`, {
@@ -200,37 +243,43 @@
                 plotNewPoint(data.coords_3d);
 
             } catch (error) {
-                alert("API 處理失敗：" + error.message);
+                alert("探針處理失敗：" + error.message);
             } finally {
                 scanBtn.disabled = false;
-                scanBtn.innerHTML = '<i class="fas fa-microscope"></i> 開始幾何偵測分析';
+                spanText.innerHTML = '<i class="fas fa-radar text-blue-200"></i> 重新啟動特徵掃描';
             }
         }
 
         function updateUI(data) {
             const resultCard = document.getElementById('resultCard');
             resultCard.classList.remove('hidden');
+            // 觸發進場動畫
+            setTimeout(() => {
+                resultCard.classList.remove('opacity-0', 'translate-y-4');
+            }, 50);
             
             document.getElementById('lidScore').innerText = data.lid_score;
             document.getElementById('latency').innerText = data.latency_ms + " ms";
-            document.getElementById('featureDim').innerText = data.feature_dim + " 維";
+            document.getElementById('featureDim').innerText = "ℝ^" + data.feature_dim;
 
             const badge = document.getElementById('statusBadge');
             const title = document.getElementById('statusTitle');
             const desc = document.getElementById('statusDesc');
 
             if (data.is_malicious) {
-                badge.className = "inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4 bg-red-900/30 text-red-400 border border-red-800";
-                badge.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i> LID 密度異常';
-                title.innerText = "偵測到 IPI 攻擊";
-                title.className = "text-3xl font-bold mb-2 text-red-400";
-                desc.innerText = `此輸入在 Layer 1 的幾何拓撲與周圍正常鄰居產生偏離。LID 評分 ${data.lid_score} 達到異常閾值，被判定為具備注入特徵。`;
+                badge.className = "px-2.5 py-1 rounded bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold tracking-wide";
+                badge.innerHTML = '<i class="fas fa-radiation"></i> 威脅攔截';
+                title.innerText = "IPI 拓樸異常";
+                title.className = "text-2xl font-bold mb-2 tracking-tight text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]";
+                desc.innerHTML = `偵測到強烈的語意劫持訊號。該輸入在空間中偏離了自然任務流形，LID 密度 (<span class="text-slate-200">${data.lid_score}</span>) 達到惡意閾值。建議中斷推論。`;
+                document.getElementById('lidScore').className = "font-mono text-xl text-red-400 font-bold drop-shadow-[0_0_5px_rgba(239,68,68,0.6)]";
             } else {
-                badge.className = "inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4 bg-emerald-900/30 text-emerald-400 border border-emerald-800";
-                badge.innerHTML = '<i class="fas fa-check-circle mr-2"></i> 流形平滑 (安全)';
-                title.innerText = "語意特徵正常";
-                title.className = "text-3xl font-bold mb-2 text-emerald-400";
-                desc.innerText = `此輸入平穩落在既有的自然語意流形區域，局部特徵密度正常。LID 評分為 ${data.lid_score}。`;
+                badge.className = "px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold tracking-wide";
+                badge.innerHTML = '<i class="fas fa-shield-check"></i> 安全放行';
+                title.innerText = "語意流形穩定";
+                title.className = "text-2xl font-bold mb-2 tracking-tight text-emerald-400";
+                desc.innerHTML = `未偵測到顯著的認知衝突。該向量平穩落於常規任務的自然流形結構內，無異常幾何特徵。`;
+                document.getElementById('lidScore').className = "font-mono text-xl text-emerald-400 font-bold";
             }
         }
 
@@ -238,13 +287,23 @@
             const userTrace = {
                 x: [coords.x], y: [coords.y], z: [coords.z],
                 mode: 'markers',
-                marker: { size: 10, color: '#facc15', symbol: 'diamond', line: {color: '#ffffff', width: 2} },
-                name: '最新輸入 (Your Prompt)', type: 'scatter3d', hoverinfo: 'text', hovertext: ['Your Latest Input']
+                marker: { 
+                    size: 12, 
+                    color: '#eab308', 
+                    symbol: 'diamond', 
+                    line: {color: '#ffffff', width: 2},
+                },
+                name: '當前截獲輸入', 
+                type: 'scatter3d', 
+                hoverinfo: 'text', 
+                hovertext: ['<b>[Target]</b> Your Prompt']
             };
 
-            if (userTraceIndex > -1) Plotly.deleteTraces('plotly-graph', userTraceIndex);
+            if (userTraceIndex > -1) {
+                Plotly.deleteTraces('plotly-graph', userTraceIndex);
+            }
             Plotly.addTraces('plotly-graph', userTrace);
-            userTraceIndex = 2; 
+            userTraceIndex = 2; // 因為 0 是 normal, 1 是 attack
         }
     </script>
 </body>
