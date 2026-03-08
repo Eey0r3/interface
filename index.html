@@ -8,84 +8,115 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans overflow-x-hidden">
 
-    <div class="max-w-6xl mx-auto py-12 px-4">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                幾何特徵探針：IPI 攻擊偵測展示
+    <div id="sidebar" class="fixed inset-y-0 left-0 w-full md:w-[600px] bg-slate-800 border-r border-slate-700 shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out z-50 flex flex-col">
+        <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900">
+            <h2 class="text-lg font-semibold text-slate-300"><i class="fas fa-cube text-blue-400 mr-2"></i>語意流形 3D 空間 (Layer 1)</h2>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white transition-colors p-2">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="flex-grow p-4 relative">
+            <div id="plotly-graph" class="w-full h-full bg-slate-900 rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center">
+                <span id="graph-loading" class="text-slate-500"><i class="fas fa-spinner animate-spin mr-2"></i>載入資料集幾何邊界中...</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300"></div>
+
+    <div class="max-w-3xl mx-auto py-12 px-4 relative z-10">
+        
+        <button onclick="toggleSidebar()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2">
+            <i class="fas fa-satellite-dish text-blue-400"></i> 展開流形雷達
+        </button>
+
+        <header class="text-center mb-10 mt-8">
+            <h1 class="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                幾何特徵探針：IPI 偵測
             </h1>
-            <p class="text-slate-400">
-                本系統連線至本機 <strong>RTX 3060 GPU 沙盒</strong>，利用 Llama-3 隱藏層特徵進行幾何空間分析與 LID 局部密度計算。
-            </p>
-            <div class="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs" id="api-status">
+            <p class="text-slate-400">利用 Llama-3 隱藏層進行即時 LID 局部密度計算</p>
+            <div class="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
                 <span class="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse" id="api-indicator"></span>
                 <span id="api-text">API 狀態：嘗試連線至幾何引擎...</span>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-4 shadow-2xl flex flex-col h-[600px]">
-                <h2 class="text-lg font-semibold text-slate-300 mb-2 pl-2"><i class="fas fa-cube mr-2"></i>語意流形 3D 空間 (Layer 1)</h2>
-                <div id="plotly-graph" class="w-full h-full bg-slate-900 rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center">
-                    <span id="graph-loading" class="text-slate-500"><i class="fas fa-spinner animate-spin mr-2"></i>載入資料集幾何邊界中...</span>
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-2xl mb-8">
+            <label class="block text-sm font-medium text-slate-400 mb-3">請輸入欲測試的指令或對話：</label>
+            <textarea id="promptInput" 
+                class="w-full h-40 bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none resize-none mb-4"
+                placeholder="例如：Please summarize the following email..."></textarea>
+            
+            <button onclick="scanPrompt()" id="scanBtn" disabled
+                class="w-full bg-slate-600 text-slate-300 font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-not-allowed text-lg tracking-wide">
+                <i class="fas fa-microscope"></i> 系統初始化中...
+            </button>
+        </div>
+
+        <div id="resultCard" class="hidden overflow-hidden rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-2xl transition-all">
+            <div id="statusBadge" class="inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4"></div>
+            <h3 id="statusTitle" class="text-3xl font-bold mb-2"></h3>
+            <p id="statusDesc" class="text-slate-400 text-sm mb-6 leading-relaxed"></p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+                    <div class="text-slate-500 text-xs mb-1">LID 幾何分數</div>
+                    <div id="lidScore" class="font-mono text-2xl text-blue-400 font-bold">--</div>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+                    <div class="text-slate-500 text-xs mb-1">推論耗時</div>
+                    <div id="latency" class="font-mono text-2xl text-emerald-400 font-bold">--</div>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+                    <div class="text-slate-500 text-xs mb-1">特徵維度</div>
+                    <div id="featureDim" class="font-mono text-2xl text-purple-400 font-bold">--</div>
                 </div>
             </div>
-
-            <div class="flex flex-col gap-6">
-                <div class="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-2xl">
-                    <label class="block text-sm font-medium text-slate-400 mb-2">輸入測試 Prompt (觀察新座標的落點)</label>
-                    <textarea id="promptInput" 
-                        class="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none mb-4"
-                        placeholder="請輸入欲測試的內容..."></textarea>
-                    
-                    <button onclick="scanPrompt()" id="scanBtn" disabled
-                        class="w-full bg-slate-600 text-slate-300 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-not-allowed">
-                        <i class="fas fa-microscope"></i> 系統初始化中...
-                    </button>
-                </div>
-
-                <div id="resultCard" class="hidden overflow-hidden rounded-xl border border-slate-700 bg-slate-900/50 p-6 transition-all">
-                    <div class="flex flex-col">
-                        <div id="statusBadge" class="inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4"></div>
-                        <h3 id="statusTitle" class="text-2xl font-bold mb-2"></h3>
-                        <p id="statusDesc" class="text-slate-400 text-sm mb-6"></p>
-
-                        <div class="space-y-3 bg-slate-900/80 p-4 rounded-lg border border-slate-800">
-                            <div class="flex justify-between text-sm">
-                                <span class="text-slate-500">LID 幾何分數 (局部本徵維度)</span>
-                                <span id="lidScore" class="font-mono text-blue-400 font-bold">--</span>
-                            </div>
-                            <div class="flex justify-between text-sm">
-                                <span class="text-slate-500">推論耗時 (Latency)</span>
-                                <span id="latency" class="font-mono text-emerald-400">--</span>
-                            </div>
-                            <div class="flex justify-between text-sm">
-                                <span class="text-slate-500">特徵維度 (Dimensions)</span>
-                                <span id="featureDim" class="font-mono text-purple-400">--</span>
-                            </div>
-                            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                                <div id="scoreBar" class="h-full bg-blue-500 transition-all duration-1000" style="width: 0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            
+            <div class="mt-6 text-center">
+                <button onclick="toggleSidebar()" class="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4 transition-colors">
+                    查看此筆輸入在 3D 流形空間中的精確落點 <i class="fas fa-arrow-right ml-1"></i>
+                </button>
             </div>
         </div>
 
-        <footer class="mt-12 text-center text-slate-500 text-sm">
-            <p>國科會研究計畫：基於 LLM 隱藏層幾何特徵之輕量化防禦</p>
-        </footer>
     </div>
 
     <script>
-        // 🚨 填入你的 Cloudflare Tunnel 網址 (不要加上結尾的 /)
+        // 🚨 填入你的 Cloudflare Tunnel 網址
         const API_BASE = "https://creatures-finding-highs-funky.trycloudflare.com"; 
 
-        // 全域變數追蹤是否已經有使用者的點
         let userTraceIndex = -1;
+        let isGraphRendered = false;
 
-        // 頁面載入時：向後端要預算好的 60 筆流形空間座標
+        // 側邊欄開關邏輯
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            if (sidebar.classList.contains('-translate-x-full')) {
+                // 開啟
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+                // 延遲一點讓 opacity 有漸變效果
+                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+                
+                // ⚠️ Plotly 在隱藏狀態下繪製會變形，必須在展開時強制重新調整大小
+                if (isGraphRendered) {
+                    setTimeout(() => {
+                        Plotly.Plots.resize('plotly-graph');
+                    }, 300);
+                }
+            } else {
+                // 關閉
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('opacity-0');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", async () => {
             try {
                 const response = await fetch(`${API_BASE}/api/dataset_info`);
@@ -95,25 +126,23 @@
                 
                 if (data.status === "success") {
                     renderBaseGraph(data.data.points);
+                    isGraphRendered = true;
                     
-                    // 解鎖掃描按鈕
                     const btn = document.getElementById("scanBtn");
                     btn.disabled = false;
-                    btn.className = "w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 cursor-pointer";
+                    btn.className = "w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-900/20 text-lg tracking-wide";
                     btn.innerHTML = '<i class="fas fa-microscope"></i> 開始幾何偵測分析';
 
-                    // 更新連線狀態
                     document.getElementById("api-indicator").className = "w-2 h-2 rounded-full bg-emerald-500 mr-2";
                     document.getElementById("api-text").innerText = "API 狀態：流形幾何引擎運作中";
                 }
             } catch (error) {
-                document.getElementById("graph-loading").innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>無法連線至 API，請確認 Docker 與 Tunnel 已啟動。</span>`;
+                document.getElementById("graph-loading").innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>無法連線，請確認 Tunnel 狀態。</span>`;
                 document.getElementById("api-indicator").className = "w-2 h-2 rounded-full bg-red-500 mr-2";
                 document.getElementById("api-text").innerText = "API 狀態：離線";
             }
         });
 
-        // 畫出基礎星圖
         function renderBaseGraph(points) {
             document.getElementById("graph-loading").style.display = "none";
             
@@ -121,33 +150,22 @@
             const attackPoints = points.filter(p => p.label === 1);
 
             const traceNormal = {
-                x: normalPoints.map(p => p.x),
-                y: normalPoints.map(p => p.y),
-                z: normalPoints.map(p => p.z),
-                mode: 'markers',
-                marker: { size: 5, color: '#10b981', opacity: 0.7 },
-                name: '正常語意 (Normal)',
-                type: 'scatter3d',
-                hoverinfo: 'text',
+                x: normalPoints.map(p => p.x), y: normalPoints.map(p => p.y), z: normalPoints.map(p => p.z),
+                mode: 'markers', marker: { size: 5, color: '#10b981', opacity: 0.7 },
+                name: '正常 (Normal)', type: 'scatter3d', hoverinfo: 'text',
                 hovertext: normalPoints.map(p => `Normal<br>${p.text}`)
             };
 
             const traceAttack = {
-                x: attackPoints.map(p => p.x),
-                y: attackPoints.map(p => p.y),
-                z: attackPoints.map(p => p.z),
-                mode: 'markers',
-                marker: { size: 5, color: '#ef4444', opacity: 0.7 },
-                name: 'IPI 攻擊 (Attack)',
-                type: 'scatter3d',
-                hoverinfo: 'text',
+                x: attackPoints.map(p => p.x), y: attackPoints.map(p => p.y), z: attackPoints.map(p => p.z),
+                mode: 'markers', marker: { size: 5, color: '#ef4444', opacity: 0.7 },
+                name: '攻擊 (Attack)', type: 'scatter3d', hoverinfo: 'text',
                 hovertext: attackPoints.map(p => `Attack<br>${p.text}`)
             };
 
             const layout = {
                 margin: { l: 0, r: 0, b: 0, t: 0 },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
                 scene: {
                     xaxis: { showgrid: true, gridcolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' },
                     yaxis: { showgrid: true, gridcolor: '#334155', backgroundcolor: 'rgba(0,0,0,0)', showbackground: false, title: '' },
@@ -159,11 +177,9 @@
             Plotly.newPlot('plotly-graph', [traceNormal, traceAttack], layout, {responsive: true});
         }
 
-        // 送出新 Prompt
         async function scanPrompt() {
             const prompt = document.getElementById('promptInput').value;
             const scanBtn = document.getElementById('scanBtn');
-            const resultCard = document.getElementById('resultCard');
 
             if (!prompt.trim()) return alert("請輸入內容");
 
@@ -178,13 +194,9 @@
                 });
 
                 const data = await response.json();
-                
                 if (data.status !== "success") throw new Error(data.detail || "分析失敗");
 
-                // 更新前端 UI
                 updateUI(data);
-
-                // 將新點打在 3D 圖上
                 plotNewPoint(data.coords_3d);
 
             } catch (error) {
@@ -195,7 +207,6 @@
             }
         }
 
-        // 更新數據面板
         function updateUI(data) {
             const resultCard = document.getElementById('resultCard');
             resultCard.classList.remove('hidden');
@@ -207,48 +218,33 @@
             const badge = document.getElementById('statusBadge');
             const title = document.getElementById('statusTitle');
             const desc = document.getElementById('statusDesc');
-            const bar = document.getElementById('scoreBar');
 
             if (data.is_malicious) {
                 badge.className = "inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4 bg-red-900/30 text-red-400 border border-red-800";
-                badge.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i> 發現幾何扭曲 (LID 異常)';
+                badge.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i> LID 密度異常';
                 title.innerText = "偵測到 IPI 攻擊";
-                title.className = "text-2xl font-bold mb-2 text-red-400";
-                desc.innerText = `輸入內容的幾何拓撲與周圍正常鄰居產生偏離。LID 評分 ${data.lid_score} 達到異常閾值。`;
-                bar.className = "h-full bg-red-500";
-                bar.style.width = "90%";
+                title.className = "text-3xl font-bold mb-2 text-red-400";
+                desc.innerText = `此輸入在 Layer 1 的幾何拓撲與周圍正常鄰居產生偏離。LID 評分 ${data.lid_score} 達到異常閾值，被判定為具備注入特徵。`;
             } else {
                 badge.className = "inline-flex items-center w-fit px-3 py-1 rounded-full text-sm font-bold mb-4 bg-emerald-900/30 text-emerald-400 border border-emerald-800";
-                badge.innerHTML = '<i class="fas fa-check-circle mr-2"></i> 流形平滑 (LID 正常)';
+                badge.innerHTML = '<i class="fas fa-check-circle mr-2"></i> 流形平滑 (安全)';
                 title.innerText = "語意特徵正常";
-                title.className = "text-2xl font-bold mb-2 text-emerald-400";
-                desc.innerText = `輸入內容平穩落在既有的自然語意流形區域，局部密度正常。LID 評分為 ${data.lid_score}。`;
-                bar.className = "h-full bg-emerald-500";
-                bar.style.width = "20%";
+                title.className = "text-3xl font-bold mb-2 text-emerald-400";
+                desc.innerText = `此輸入平穩落在既有的自然語意流形區域，局部特徵密度正常。LID 評分為 ${data.lid_score}。`;
             }
         }
 
-        // 在 3D 圖中加入使用者的座標
         function plotNewPoint(coords) {
             const userTrace = {
-                x: [coords.x],
-                y: [coords.y],
-                z: [coords.z],
+                x: [coords.x], y: [coords.y], z: [coords.z],
                 mode: 'markers',
-                marker: { size: 12, color: '#facc15', symbol: 'diamond', line: {color: '#ffffff', width: 2} }, // 黃色大鑽石
-                name: '最新輸入 (Your Prompt)',
-                type: 'scatter3d',
-                hoverinfo: 'text',
-                hovertext: ['Your Latest Input']
+                marker: { size: 10, color: '#facc15', symbol: 'diamond', line: {color: '#ffffff', width: 2} },
+                name: '最新輸入 (Your Prompt)', type: 'scatter3d', hoverinfo: 'text', hovertext: ['Your Latest Input']
             };
 
-            // 如果之前已經打過點，就刪掉舊的再加新的
-            if (userTraceIndex > -1) {
-                Plotly.deleteTraces('plotly-graph', userTraceIndex);
-            }
-            
+            if (userTraceIndex > -1) Plotly.deleteTraces('plotly-graph', userTraceIndex);
             Plotly.addTraces('plotly-graph', userTrace);
-            userTraceIndex = 2; // Trace 0 是 Normal, Trace 1 是 Attack, Trace 2 是最新的點
+            userTraceIndex = 2; 
         }
     </script>
 </body>
